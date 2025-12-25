@@ -1,0 +1,12 @@
+server:
+  port: 8080 # 后端端口
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/campus_trading
+
+  servlet:
+    multipart:
+      max-file-size: 10MB  # 限制上传文件大小
+      max-request-size: 10MB
