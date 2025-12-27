@@ -73,8 +73,13 @@ const routes = [
         path: '/my-orders',
         name: 'MyOrders',
         component: () => import('../components/User/MyOrders.vue')
+    },
+    // 新增：个人设置页
+    {
+        path: '/settings',
+        name: 'Settings',
+        component: () => import('../components/User/UserSettings.vue')
     }
-    // ... 其他页面路由后续补充
 ]
 
 const router = createRouter({

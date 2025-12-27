@@ -3,12 +3,18 @@
     <!-- 头部背景与信息 -->
     <div class="header-bg">
       <div class="user-info" v-if="userStore.userInfo">
-        <el-avatar :size="70" :src="userStore.userInfo.avatar || 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'" class="avatar-border"></el-avatar>
+        <!-- 显示用户头像，若无则显示默认头像 -->
+        <el-avatar
+            :size="70"
+            :src="userStore.userInfo.avatar || 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'"
+            class="avatar-border"
+        ></el-avatar>
         <div class="text-info">
           <div class="nickname">{{ userStore.userInfo.nickname }}</div>
           <div class="campus-badge">{{ userStore.userInfo.campus }}校区</div>
         </div>
       </div>
+      <!-- 未登录状态 -->
       <div class="user-info" v-else @click="$router.push('/login')">
         <el-avatar :size="70" icon="UserFilled" class="avatar-border"></el-avatar>
         <div class="text-info">
@@ -18,7 +24,7 @@
       </div>
     </div>
 
-    <!-- 功能卡片 (修改为 3 列布局) -->
+    <!-- 功能卡片 (3列布局) -->
     <div class="action-card">
       <div class="card-item" @click="handleGo('/my-publishes')">
         <el-icon class="icon-pub" :size="28"><Shop /></el-icon>
@@ -36,7 +42,8 @@
 
     <!-- 列表菜单 -->
     <div class="menu-list">
-      <div class="menu-item">
+      <!-- 跳转到设置页 -->
+      <div class="menu-item" @click="handleGo('/settings')">
         <span>个人设置</span>
         <el-icon><ArrowRight /></el-icon>
       </div>
@@ -44,6 +51,7 @@
         <span>帮助与反馈</span>
         <el-icon><ArrowRight /></el-icon>
       </div>
+      <!-- 退出登录 -->
       <div class="menu-item" v-if="userStore.userInfo" @click="handleLogout">
         <span class="logout-text">退出登录</span>
       </div>
@@ -60,6 +68,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 const userStore = useUserStore()
 const router = useRouter()
 
+// 通用跳转逻辑，需登录
 const handleGo = (path) => {
   if (!userStore.userInfo) {
     ElMessage.warning('请先登录')
@@ -69,6 +78,7 @@ const handleGo = (path) => {
   router.push(path)
 }
 
+// 退出登录
 const handleLogout = () => {
   ElMessageBox.confirm('确定要退出登录吗?', '提示', {
     confirmButtonText: '确定',

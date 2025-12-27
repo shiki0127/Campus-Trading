@@ -1,14 +1,26 @@
 <template>
   <div class="message-container">
-    <div class="msg-header">消息</div>
+    <div class="msg-header">消息中心</div>
 
-    <!-- 模拟 INS 风格 Story (装饰用，暂未对接) -->
-    <div class="story-bar">
-      <div class="story-item">
-        <div class="avatar-ring admin">
-          <img src="https://via.placeholder.com/50" />
+    <!-- 顶部通知栏 -->
+    <div class="notice-bar">
+      <div class="notice-card system">
+        <div class="icon-box">
+          <el-icon><BellFilled /></el-icon>
         </div>
-        <span>系统通知</span>
+        <div class="text-box">
+          <div class="n-title">系统通知</div>
+          <div class="n-desc">暂无新通知</div>
+        </div>
+      </div>
+      <div class="notice-card activity">
+        <div class="icon-box">
+          <el-icon><Flag /></el-icon>
+        </div>
+        <div class="text-box">
+          <div class="n-title">交易动态</div>
+          <div class="n-desc">订单状态更新</div>
+        </div>
       </div>
     </div>
 
@@ -16,16 +28,22 @@
     <div class="chat-list">
       <div v-if="chatList.length === 0" class="empty-tip">暂无消息记录</div>
 
-      <div v-for="chat in chatList" :key="chat.id" class="chat-item" @click="goChat(chat)">
-        <!-- 显示头像，如果没有则显示默认图 -->
-        <el-avatar :size="50" :src="chat.avatar || 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'"></el-avatar>
+      <div v-for="chat in chatList" :key="chat.id" class="chat-item-wrapper">
+        <div class="chat-item" @click="goChat(chat)">
+          <el-avatar :size="50" :src="chat.avatar || 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'"></el-avatar>
 
-        <div class="chat-content">
-          <div class="top-row">
-            <span class="name">{{ chat.name }}</span>
-            <span class="time">{{ formatTime(chat.time) }}</span>
+          <div class="chat-content">
+            <div class="top-row">
+              <span class="name">{{ chat.name }}</span>
+              <span class="time">{{ formatTime(chat.time) }}</span>
+            </div>
+            <div class="msg-preview">{{ chat.lastMsg }}</div>
           </div>
-          <div class="msg-preview">{{ chat.lastMsg }}</div>
+
+          <!-- 删除按钮 (阻止冒泡) -->
+          <div class="delete-btn" @click.stop="handleDelete(chat)">
+            <el-icon><Delete /></el-icon>
+          </div>
         </div>
       </div>
     </div>
@@ -35,36 +53,62 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { BellFilled, Flag, Delete } from '@element-plus/icons-vue'
 import request from '../../api/request'
 import { useUserStore } from '../../stores/user'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const userStore = useUserStore()
 const chatList = ref([])
 
-onMounted(async () => {
+const loadChats = async () => {
   if (userStore.userInfo) {
     try {
-      // 调用后端接口获取最近聊天列表
       const res = await request.get(`/chat/list/${userStore.userInfo.id}`)
       chatList.value = res
     } catch (e) {
       console.error(e)
     }
   }
+}
+
+onMounted(() => {
+  loadChats()
 })
 
 const goChat = (chat) => {
-  // 跳转到详情页，带上对方的ID和名字
   router.push(`/chat/${chat.id}?name=${chat.name}`)
 }
 
-// 时间格式化工具
+// 修复：真实删除逻辑
+const handleDelete = (chat) => {
+  ElMessageBox.confirm('确定要删除该对话吗？(这将清空聊天记录)', '提示', {
+    confirmButtonText: '删除',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      // 调用后端删除接口，传入对方ID (chat.id) 和当前用户ID
+      await request.delete(`/chat/delete/${chat.id}`, {
+        params: {
+          currentUserId: userStore.userInfo.id
+        }
+      })
+
+      // 后端删除成功后，前端移除
+      chatList.value = chatList.value.filter(item => item.id !== chat.id)
+      ElMessage.success('已删除')
+    } catch (e) {
+      console.error(e)
+    }
+  }).catch(() => {})
+}
+
 const formatTime = (timeStr) => {
   if (!timeStr) return ''
   const date = new Date(timeStr)
   const now = new Date()
-  // 如果是今天，只显示时间；如果是以前，显示日期
   if (date.toDateString() === now.toDateString()) {
     return `${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`
   } else {
@@ -75,23 +119,49 @@ const formatTime = (timeStr) => {
 
 <style scoped>
 .message-container { padding-bottom: 70px; background: white; min-height: 100vh; }
-.msg-header { padding: 15px; font-weight: bold; font-size: 18px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: white; z-index: 10; }
+.msg-header { padding: 15px; font-weight: bold; font-size: 18px; border-bottom: 1px solid #f5f5f5; position: sticky; top: 0; background: white; z-index: 10; }
 
-.story-bar { display: flex; overflow-x: auto; padding: 15px; border-bottom: 1px solid #f5f5f5; }
-.story-bar::-webkit-scrollbar { display: none; }
-.story-item { display: flex; flex-direction: column; align-items: center; margin-right: 15px; min-width: 60px; }
-.avatar-ring { width: 56px; height: 56px; border-radius: 50%; padding: 2px; border: 2px solid #ddd; margin-bottom: 5px; }
-.avatar-ring.admin { border-color: #409EFF; }
-.avatar-ring img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-.story-item span { font-size: 11px; color: #666; }
+.notice-bar { padding: 15px; display: flex; gap: 10px; overflow-x: auto; background: #fff; border-bottom: 10px solid #f5f7fa; }
+.notice-card {
+  flex: 1; min-width: 140px; height: 70px; border-radius: 12px; display: flex; align-items: center; padding: 0 15px;
+  color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;
+}
+.notice-card.system { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%); }
+.notice-card.activity { background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); }
+
+.icon-box {
+  width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+.text-box { margin-left: 10px; }
+.n-title { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+.n-desc { font-size: 10px; opacity: 0.9; }
 
 .chat-list { padding: 0; }
-.chat-item { display: flex; padding: 15px; align-items: center; cursor: pointer; }
-.chat-item:active { background-color: #f9f9f9; }
-.chat-content { flex: 1; margin-left: 15px; border-bottom: 1px solid #f9f9f9; padding-bottom: 15px; }
+.chat-item-wrapper { border-bottom: 1px solid #f9f9f9; }
+.chat-item {
+  display: flex; padding: 15px; align-items: center; cursor: pointer; position: relative;
+  transition: background-color 0.2s;
+}
+.chat-item:active { background-color: #f5f5f5; }
+.chat-content { flex: 1; margin-left: 15px; padding-right: 30px; /* 留出删除按钮空间 */ }
 .top-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
 .name { font-weight: bold; font-size: 15px; color: #333; }
 .time { font-size: 11px; color: #bbb; }
-.msg-preview { color: #888; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px; }
+.msg-preview { color: #888; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+
+/* 删除按钮样式 */
+.delete-btn {
+  padding: 8px;
+  color: #ccc;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.delete-btn:hover {
+  color: #F56C6C;
+  background-color: #fef0f0;
+}
+
 .empty-tip { text-align: center; padding: 30px; color: #999; font-size: 14px; }
 </style>

@@ -10,23 +10,23 @@
 
       <div v-for="item in orders" :key="item.id" class="order-item">
         <div class="item-header">
-          <span class="time">订单号: {{ item.orderNo.substring(0, 8) }}...</span>
-          <!-- 状态显示逻辑 -->
+          <span class="time">订单号: {{ item.orderNo.substring(0, 8) }}</span>
           <span class="status" :class="getStatusColor(item.status)">
             {{ getStatusText(item.status) }}
           </span>
         </div>
-        <div class="item-body">
+        <div class="item-body" @click="goToDetail(item.productId)">
           <img :src="item.productImage || 'https://via.placeholder.com/80'" class="prod-img">
           <div class="info">
             <div class="title">{{ item.productTitle }}</div>
             <div class="price">成交价: ¥{{ item.price }}</div>
-            <div class="buyer">买家ID: {{ item.buyerId.substring(0,6) }}...</div>
+            <div class="buyer">买家: {{ item.buyerName || '未知用户' }}</div>
           </div>
         </div>
         <div class="item-footer">
+          <!-- 恢复关联：联系买家时带上商品信息，并标记身份为卖家 -->
           <el-button size="small" round @click="contactBuyer(item)">联系买家</el-button>
-          <!-- 只有已支付(1)状态下才能发货 -->
+
           <el-button
               v-if="item.status === 1"
               size="small"
@@ -54,7 +54,7 @@ const userStore = useUserStore()
 const router = useRouter()
 const orders = ref([])
 
-onMounted(async () => {
+onMounted(() => {
   if(userStore.userInfo) {
     loadData()
   }
@@ -69,6 +69,10 @@ const loadData = async () => {
   }
 }
 
+const goToDetail = (productId) => {
+  router.push(`/product/${productId}`)
+}
+
 const handleDeliver = (item) => {
   ElMessageBox.confirm('确认已将商品交付给买家吗?', '发货确认', {
     confirmButtonText: '确认发货',
@@ -77,13 +81,27 @@ const handleDeliver = (item) => {
   }).then(async () => {
     await request.post(`/order/deliver/${item.id}`)
     ElMessage.success('发货成功')
-    loadData() // 刷新列表
+    loadData()
   })
 }
 
 const contactBuyer = (item) => {
-  // 暂时跳到聊天页，名字暂用买家ID代替
-  router.push(`/chat/${item.buyerId}?name=买家${item.buyerId.substring(0,4)}`)
+  // 优化：恢复商品上下文，同时增加 role 参数
+  router.push({
+    path: `/chat/${item.buyerId}`,
+    query: {
+      name: item.buyerName || '买家',
+      // 传递商品信息，恢复“上下文关联”
+      productId: item.productId,
+      productTitle: item.productTitle,
+      productPrice: item.price,
+      productImage: item.productImage,
+      // 关键：标记当前视角是卖家 (seller)，后续 ChatDetail 可以根据这个字段
+      // 将“我想要”按钮改为“发送订单详情”或隐藏，避免尴尬
+      role: 'seller',
+      orderId: item.id // 还可以带上订单ID
+    }
+  })
 }
 
 const getStatusText = (status) => {
@@ -110,12 +128,12 @@ const getStatusColor = (status) => {
 .text-red { color: #F56C6C; font-weight: bold; }
 .text-gray { color: #909399; }
 
-.item-body { display: flex; margin-bottom: 12px; }
+.item-body { display: flex; margin-bottom: 12px; cursor: pointer; }
 .prod-img { width: 70px; height: 70px; border-radius: 6px; object-fit: cover; background: #eee; }
 .info { flex: 1; margin-left: 10px; display: flex; flex-direction: column; justify-content: space-between; }
 .title { font-size: 14px; font-weight: bold; color: #333; }
 .price { color: #f56c6c; font-weight: bold; font-size: 13px; }
-.buyer { font-size: 11px; color: #999; }
+.buyer { font-size: 11px; color: #666; }
 
 .item-footer { display: flex; justify-content: flex-end; }
 </style>

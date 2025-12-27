@@ -15,4 +15,5 @@ public class User {
     private String avatar;   // 头像URL
     private String campus;   // 校区 (呈贡/东陆)
     private Double balance;  // 余额 (模拟支付用)
+    private String gender;   // 性别
 }

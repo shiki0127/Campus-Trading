@@ -2,7 +2,8 @@
   <div class="home-container">
     <!-- 顶部导航栏 -->
     <div class="nav-bar">
-      <div class="logo">校园二手</div>
+      <!-- 点击Logo重置列表 -->
+      <div class="logo" @click="resetList">校园二手</div>
       <div class="search-box">
         <el-input
             v-model="searchKeyword"
@@ -19,9 +20,9 @@
     <!-- 轮播图 -->
     <div class="carousel-box">
       <el-carousel height="160px" :interval="4000" type="card">
-        <el-carousel-item v-for="item in 3" :key="item">
-          <!-- 这里使用随机图，后续可替换为本地 assets 图片 -->
-          <img class="carousel-img" :src="`https://picsum.photos/400/200?random=${item}`" />
+        <el-carousel-item v-for="(img, index) in bannerImages" :key="index">
+          <!-- 使用本地图片 -->
+          <img class="carousel-img" :src="img" />
         </el-carousel-item>
       </el-carousel>
     </div>
@@ -29,7 +30,7 @@
     <!-- 分类 -->
     <div class="category-grid">
       <div v-for="cat in categories" :key="cat.text" class="cat-item" @click="filterByCat(cat.text)">
-        <div class="icon-circle">
+        <div class="icon-circle" :class="{'active': currentCategory === cat.text}">
           <el-icon :size="20"><component :is="cat.icon" /></el-icon>
         </div>
         <span>{{ cat.text }}</span>
@@ -38,7 +39,9 @@
 
     <!-- 热门商品 -->
     <div class="product-section">
-      <h3 class="section-title">🔥 热门推荐</h3>
+      <h3 class="section-title">
+        {{ currentCategory === '全部' ? '🔥 热门推荐' : `📂 ${currentCategory}` }}
+      </h3>
       <div class="product-list">
         <div v-for="prod in productList" :key="prod.id" class="product-card" @click="goDetail(prod.id)">
           <div class="img-box">
@@ -48,7 +51,8 @@
           <div class="info">
             <div class="title">{{ prod.title }}</div>
             <div class="price-row">
-              <span class="price">¥{{ prod.price }}</span>
+              <!-- 修复：删除了这里的 ¥ 符号，由 CSS 伪元素生成 -->
+              <span class="price">{{ prod.price }}</span>
               <span class="time">{{ formatDate(prod.createTime) }}</span>
             </div>
             <div class="seller">
@@ -70,13 +74,29 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '../../api/request'
-import { Notebook, Monitor, Coffee, Bicycle, Sugar, Goods, Baseball, MoreFilled, Search } from '@element-plus/icons-vue'
+import { Notebook, Monitor, Coffee, Bicycle, Sugar, Goods, Baseball, MoreFilled, Search, Menu } from '@element-plus/icons-vue'
+
+// --- 轮播图配置 ---
+// 动态引入 src/assets/images/ 下的图片
+const getAssetUrl = (name) => {
+  return new URL(`../../assets/images/${name}`, import.meta.url).href
+}
+
+const bannerImages = [
+  // 请确保你有这些图片，或者暂时换回 https://picsum.photos/400/200?random=1
+  getAssetUrl('banner1.jpg'),
+  getAssetUrl('banner2.jpg'),
+  getAssetUrl('banner3.jpg')
+]
+// ----------------
 
 const router = useRouter()
 const productList = ref([])
 const searchKeyword = ref('')
+const currentCategory = ref('全部')
 
 const categories = [
+  { text: '全部', icon: Menu },
   { text: '书籍', icon: Notebook },
   { text: '数码', icon: Monitor },
   { text: '生活', icon: Coffee },
@@ -87,7 +107,6 @@ const categories = [
   { text: '其他', icon: MoreFilled }
 ]
 
-// 加载数据 (支持传入查询参数)
 const loadData = async (params = {}) => {
   try {
     const res = await request.get('/product/list', { params })
@@ -99,13 +118,27 @@ const loadData = async (params = {}) => {
 
 // 搜索功能
 const handleSearch = () => {
+  currentCategory.value = '搜索结果'
   loadData({ keyword: searchKeyword.value })
 }
 
 // 分类筛选
 const filterByCat = (cat) => {
-  searchKeyword.value = '' // 切换分类时清空搜索词
-  loadData({ category: cat })
+  searchKeyword.value = ''
+  currentCategory.value = cat
+
+  if (cat === '全部') {
+    loadData({}) // 加载所有
+  } else {
+    loadData({ category: cat })
+  }
+}
+
+// 点击Logo重置
+const resetList = () => {
+  searchKeyword.value = ''
+  currentCategory.value = '全部'
+  loadData({})
 }
 
 const goDetail = (id) => {
@@ -139,10 +172,9 @@ onMounted(() => {
   z-index: 100;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-.logo { font-weight: bold; font-size: 18px; margin-right: 12px; white-space: nowrap; }
+.logo { font-weight: bold; font-size: 18px; margin-right: 12px; white-space: nowrap; cursor: pointer; }
 .search-box { flex: 1; }
 
-/* 穿透修改 Element Plus 输入框样式 */
 .nav-bar :deep(.el-input__wrapper) { border-radius: 20px; background-color: rgba(255, 255, 255, 0.9); box-shadow: none; }
 .nav-bar :deep(.el-input__inner) { color: #333; }
 
@@ -150,15 +182,17 @@ onMounted(() => {
 .carousel-img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
 
 .category-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;
-  padding: 20px; background: white; margin: 0 12px; border-radius: 12px;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  padding: 15px; background: white; margin: 0 12px; border-radius: 12px;
 }
-.cat-item { display: flex; flex-direction: column; align-items: center; font-size: 12px; color: #666; cursor: pointer; }
+.cat-item { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: #666; cursor: pointer; }
 .icon-circle {
-  width: 40px; height: 40px; background: #ecf5ff; border-radius: 50%;
+  width: 36px; height: 36px; background: #ecf5ff; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  color: #409EFF; margin-bottom: 5px;
+  color: #409EFF; margin-bottom: 5px; transition: all 0.2s;
 }
+.icon-circle.active { background: #409EFF; color: white; }
 
 .product-section { margin-top: 12px; padding: 0 12px; }
 .section-title { font-size: 16px; margin: 10px 4px; font-weight: bold; color: #333; }
@@ -176,7 +210,7 @@ onMounted(() => {
 .title { font-size: 14px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 8px; font-weight: 500; }
 .price-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px; }
 .price { color: #f56c6c; font-weight: bold; font-size: 16px; }
-.price::before { content: '¥'; font-size: 12px; }
+.price::before { content: '¥'; font-size: 12px; } /* 这里添加符号 */
 .time { font-size: 10px; color: #999; }
 .seller { display: flex; align-items: center; font-size: 11px; color: #999; }
 .seller .name { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80px;}
